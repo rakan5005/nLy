@@ -1,0 +1,10 @@
+# Rate limits for Tellonym (SAFE - public API, no auth, no IP risk)
+default:
+  requests_per_second: 2.0    # ~120/min
+  burst: 15
+safe_mode:
+  requests_per_second: 1.0    # ~60/min
+  burst: 8
+strict_mode:
+  requests_per_second: 0.5    # ~30/min
+  burst: 4

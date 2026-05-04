@@ -1,0 +1,50 @@
+# By nLy - Default Configuration
+
+concurrency:
+  default_workers: 10
+  max_workers: 50
+  adaptive: true
+
+cache:
+  enabled: true
+  memory_size: 10000
+  disk_enabled: false
+  disk_path: ".by_nly_cache"
+
+logging:
+  level: "INFO"
+  dir: "logs"
+  errors_file: "errors.log"
+  results_file: "results.log"
+  stats_file: "stats.log"
+  max_file_size_mb: 10
+
+retry:
+  max_attempts: 3
+  base_delay: 1.0
+  max_delay: 30.0
+  exponential_base: 2.0
+
+request:
+  timeout_seconds: 15
+  user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+
+safe_modes:
+  validate-only:
+    check_enabled: false
+    description: "Local validation only, no network requests"
+  check-only:
+    generate_enabled: false
+    description: "Only check existing usernames, no generation"
+  generate-and-check:
+    generate_enabled: true
+    check_enabled: true
+    description: "Full pipeline: generate then check"
+  safe-mode:
+    concurrency_factor: 0.5
+    rate_factor: 0.5
+    description: "Half speed, conservative rate limits"
+  strict-mode:
+    concurrency_factor: 0.25
+    rate_factor: 0.25
+    description: "Quarter speed, maximum safety"

@@ -1,0 +1,49 @@
+[project]
+name = "by-nly"
+version = "1.0.0"
+description = "Fast username generator and availability checker for Snapchat, Telegram, TikTok, X, and Tellonym"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [{name = "By nLy"}]
+dependencies = [
+    "click>=8.1",
+    "aiohttp>=3.9",
+    "rich>=13.7",
+    "structlog>=24.1",
+    "pydantic>=2.6",
+    "pyyaml>=6.0",
+    "aiofiles>=23.2",
+    "telethon>=1.36",
+    "colorama>=0.4",
+    "aiohttp-socks>=0.9",
+    "questionary>=2.0",
+    "curl-cffi>=0.6",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "pytest-mock>=3.12",
+    "ruff>=0.3",
+]
+
+[project.scripts]
+by-nly = "by_nly.cli.main:main"
+nLy = "by_nly.cli.main:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["by_nly*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"

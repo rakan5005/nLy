@@ -1,0 +1,6 @@
+default:
+  requests_per_second: 0.5
+  burst: 2
+safe_mode:
+  requests_per_second: 0.25
+  burst: 1

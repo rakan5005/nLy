@@ -1,0 +1,33 @@
+# Discord platform config (DISABLED - replaced by 5 other platforms)
+
+# Snapchat configuration
+snapchat:
+  name: "Snapchat"
+  base_url: "https://www.snapchat.com"
+  check_url: "/add/{username}"
+  available_status: 404
+  taken_status: 200
+
+telegram:
+  name: "Telegram"
+  mtproto: true
+  fallback_url: "https://t.me/{username}"
+
+tiktok:
+  name: "TikTok"
+  base_url: "https://www.tiktok.com"
+  check_url: "/@{username}"
+  error_pattern: '"statusCode":10221'
+
+twitter:
+  name: "X (Twitter)"
+  base_url: "https://x.com"
+  check_url: "/{username}"
+  error_pattern: '<div class="error-panel"><span>User'
+  nitter_fallback: "https://nitter.privacydev.net/{username}"
+
+tellonym:
+  name: "Tellonym"
+  base_url: "https://tellonym.me"
+  check_url: "/api/accounts/check?username={username}"
+  api_json: true

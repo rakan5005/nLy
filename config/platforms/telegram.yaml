@@ -1,0 +1,10 @@
+# Rate limits for Telegram (SAFE - MTProto or t.me web fallback)
+default:
+  requests_per_second: 3.0   # ~180/min via t.me
+  burst: 15
+safe_mode:
+  requests_per_second: 1.5  # ~90/min
+  burst: 8
+strict_mode:
+  requests_per_second: 0.5   # ~30/min
+  burst: 3
