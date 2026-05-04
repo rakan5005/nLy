@@ -319,6 +319,42 @@ def export(fmt, infile, output):
     console.print(f"[green]Exported to: {out}[/]")
 
 
+@main.command()
+def update():
+    """Pull latest updates from GitHub and reinstall."""
+    import subprocess
+    import sys
+
+    console.print("[cyan]Pulling latest updates...[/]")
+    try:
+        result = subprocess.run(
+            ["git", "pull"],
+            capture_output=True, text=True, timeout=30,
+        )
+        if result.returncode != 0:
+            console.print(f"[red]git pull failed:[/]\n{result.stderr}")
+            return
+        output = result.stdout.strip() or "Already up to date."
+        console.print(f"[dim]{output}[/]")
+    except FileNotFoundError:
+        console.print("[red]git not found. Install git first: https://git-scm.com[/]")
+        return
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/]")
+        return
+
+    console.print("[cyan]Reinstalling...[/]")
+    try:
+        subprocess.run(
+            [sys.executable, "-m", "pip", "install", "-e", "."],
+            capture_output=True, timeout=60,
+        )
+        console.print("[green]Updated and reinstalled successfully![/]")
+    except Exception as e:
+        console.print(f"[yellow]Reinstall had issues: {e}[/]")
+        console.print("[dim]Try manually: pip install -e .[/]")
+
+
 async def _generate(
     platform_str, pattern, limit, output, workers, safe_mode, do_check, fmt,
     tor, free_proxies, proxy, proxy_file, no_health_check: bool = False,
