@@ -136,9 +136,10 @@ async def interactive_mode():
     # Summary
     console.print("")
     _print_line()
+    limit_label = "Unlimited" if limit is None else f"{limit:,}"
     console.print(f"  Platform : {Platform.display_name(platform)}")
     console.print(f"  Pattern  : {pattern}")
-    console.print(f"  Limit    : {'Unlimited' if limit is None else f'{limit:,}'}")
+    console.print(f"  Limit    : {limit_label}")
     console.print(f"  Workers  : {workers}")
     console.print(f"  Safe     : {'Yes' if safe_mode else 'No'}")
     console.print(f"  Fast     : {'Yes' if fast_mode else 'No'}")
@@ -184,7 +185,8 @@ async def _run_check(platform, pattern, limit, workers, sm, proxy_manager, fast_
 
     console.print("")
     console.print(f"[green]Generated {len(usernames):,} usernames[/green]")
-    console.print(f"[dim]Platform: {Platform.display_name(platform)} | Workers: {workers} | Pattern: {pattern} | Fast: {fast_mode} | Limit: {'None' if limit is None else limit:,}[/dim]")
+    limit_display = "None" if limit is None else f"{limit:,}"
+    console.print(f"[dim]Platform: {Platform.display_name(platform)} | Workers: {workers} | Pattern: {pattern} | Fast: {fast_mode} | Limit: {limit_display}[/dim]")
     console.print("")
 
     dashboard = Dashboard(console)
