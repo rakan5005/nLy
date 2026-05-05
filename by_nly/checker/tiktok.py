@@ -1,4 +1,4 @@
-"""TikTok availability checker via web + API fallback."""
+"""TikTok availability checker via urlebird.com mirror + web + API fallback."""
 
 from .base import BaseChecker
 from ..models.enums import Platform, Status
@@ -16,23 +16,31 @@ class TikTokChecker(BaseChecker):
     def __init__(self, session):
         self._session = session
 
-    async def _check_via_api(self, username: str) -> tuple[Status, str] | None:
-        """Try TikTok's public API."""
-        url = f"https://www.tiktok.com/api/merchant/test/?username={username}"
+    async def _check_via_urlebird(self, username: str) -> tuple[Status, str] | None:
+        url = f"https://urlebird.com/user/{username}/"
         headers = {
             "User-Agent": TIKTOK_UA,
-            "Accept": "application/json",
+            "Accept": "text/html,application/xhtml+xml",
         }
         try:
-            async with self._session.get(url, headers=headers, timeout=8) as resp:
+            async with self._session.get(
+                url, headers=headers, timeout=10, allow_redirects=True
+            ) as resp:
                 if resp.status == 404:
-                    return Status.AVAILABLE, "api: no user"
+                    return Status.AVAILABLE, "urlebird: 404"
                 elif resp.status == 200:
-                    return Status.TAKEN, "api: user exists"
+                    text = await resp.text()
+                    has_user = "followers" in text.lower() or "following" in text.lower()
+                    not_found = "not found" in text.lower() or "doesn't exist" in text.lower()
+                    if not_found:
+                        return Status.AVAILABLE, "urlebird: not found"
+                    if has_user:
+                        return Status.TAKEN, "urlebird: profile exists"
+                return None
         except Exception:
             return None
 
-    async def _check_availability(self, username: str) -> tuple[Status, str]:
+    async def _check_via_web(self, username: str) -> tuple[Status, str] | None:
         url = f"https://www.tiktok.com/@{username}"
         headers = {
             "User-Agent": TIKTOK_UA,
@@ -49,27 +57,48 @@ class TikTokChecker(BaseChecker):
                     explicit_not_found = 'could not be found' in text or 'doesn\'t exist' in text
                     is_blocked = 'captcha' in text.lower() or 'verify you are human' in text.lower()
                     has_og_title = '<meta property="og:title"' in text
-                    
+
                     if is_blocked:
-                        return Status.UNKNOWN, "blocked by captcha (use --proxy)"
+                        return None
                     if status_code_10221 and not has_og_title:
-                        return Status.AVAILABLE, "user not found"
+                        return Status.AVAILABLE, "web: not found"
                     if explicit_not_found:
-                        return Status.AVAILABLE, "user not found"
+                        return Status.AVAILABLE, "web: not found"
                     if has_og_title:
-                        return Status.TAKEN, "profile exists"
-                    return Status.UNKNOWN, "ambiguous page"
-                    
-                elif resp.status in (429, 403):
-                    api = await self._check_via_api(username)
-                    if api:
-                        return api
-                    return Status.RATE_LIMITED, "blocked (Akamai)"
+                        return Status.TAKEN, "web: profile exists"
+                    return None
                 elif resp.status == 404:
-                    return Status.AVAILABLE, "404"
-                return Status.UNKNOWN, f"HTTP {resp.status}"
-        except Exception as e:
-            api = await self._check_via_api(username)
-            if api:
-                return api
-            return Status.UNKNOWN, str(e)[:200]
+                    return Status.AVAILABLE, "web: 404"
+                return None
+        except Exception:
+            return None
+
+    async def _check_via_api(self, username: str) -> tuple[Status, str] | None:
+        url = f"https://www.tiktok.com/api/merchant/test/?username={username}"
+        headers = {
+            "User-Agent": TIKTOK_UA,
+            "Accept": "application/json",
+        }
+        try:
+            async with self._session.get(url, headers=headers, timeout=8) as resp:
+                if resp.status == 404:
+                    return Status.AVAILABLE, "api: no user"
+                elif resp.status == 200:
+                    return Status.TAKEN, "api: user exists"
+        except Exception:
+            return None
+
+    async def _check_availability(self, username: str) -> tuple[Status, str]:
+        urlebird = await self._check_via_urlebird(username)
+        if urlebird:
+            return urlebird
+
+        web = await self._check_via_web(username)
+        if web:
+            return web
+
+        api = await self._check_via_api(username)
+        if api:
+            return api
+
+        return Status.UNKNOWN, "all methods blocked (use proxy)"

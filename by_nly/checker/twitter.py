@@ -15,8 +15,6 @@ BOT_UA = "Twitterbot/1.0"
 
 NITTER_INSTANCES = [
     "nitter.net",
-    "nitter.space",
-    "nitter.privacydev.net",
     "nitter.nl",
     "nitter.it",
     "nitter.poast.org",

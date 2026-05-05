@@ -207,11 +207,12 @@ async def _run_check(platform, pattern, limit, workers, sm, proxy_manager, fast_
     _unknown_streak = 0
     _warning_shown = False
 
+    shared_session = await _create_session_with_proxy(proxy_manager)
+    checker = get_checker(platform, shared_session)
+    await checker.ensure_connected()
+
     async def worker(queue: asyncio.Queue, worker_id: int):
         nonlocal _unknown_streak, _warning_shown
-        session = await _create_session_with_proxy(proxy_manager)
-        checker = get_checker(platform, session)
-        await checker.ensure_connected()
 
         try:
             while True:
@@ -270,8 +271,7 @@ async def _run_check(platform, pattern, limit, workers, sm, proxy_manager, fast_
 
                 queue.task_done()
         finally:
-            await checker.disconnect()
-            await session.close()
+            pass
 
     queue: asyncio.Queue = asyncio.Queue()
     for name in usernames:
@@ -289,6 +289,8 @@ async def _run_check(platform, pattern, limit, workers, sm, proxy_manager, fast_
     for t in tasks:
         t.cancel()
 
+    await checker.disconnect()
+    await shared_session.close()
     dashboard.stop()
 
     cache.save_to_disk()

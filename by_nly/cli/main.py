@@ -428,11 +428,12 @@ async def _generate(
     _unknown_streak = 0
     _warning_shown = False
 
+    shared_session = await _create_session(proxy_manager)
+    checker = get_checker(platform, shared_session)
+    await checker.ensure_connected()
+
     async def worker(queue: asyncio.Queue, worker_id: int):
         nonlocal _unknown_streak, _warning_shown
-        session = await _create_session(proxy_manager)
-        checker = get_checker(platform, session)
-        await checker.ensure_connected()
 
         try:
             while True:
@@ -494,8 +495,7 @@ async def _generate(
 
                 queue.task_done()
         finally:
-            await checker.disconnect()
-            await session.close()
+            pass
 
     queue: asyncio.Queue = asyncio.Queue()
     for name in usernames:
@@ -513,6 +513,8 @@ async def _generate(
     for t in tasks:
         t.cancel()
 
+    await checker.disconnect()
+    await shared_session.close()
     dashboard.stop()
 
     cache.save_to_disk()
@@ -610,11 +612,12 @@ async def _check(
     _unknown_streak = 0
     _warning_shown = False
 
+    shared_session = await _create_session(proxy_manager)
+    checker = get_checker(platform, shared_session)
+    await checker.ensure_connected()
+
     async def worker(queue: asyncio.Queue, worker_id: int):
         nonlocal _unknown_streak, _warning_shown
-        session = await _create_session(proxy_manager)
-        checker = get_checker(platform, session)
-        await checker.ensure_connected()
 
         try:
             while True:
@@ -673,8 +676,7 @@ async def _check(
                 log_result(logger, platform.value, username, result.status.value, result.reason, result.response_time_ms)
                 queue.task_done()
         finally:
-            await checker.disconnect()
-            await session.close()
+            pass
 
     queue: asyncio.Queue = asyncio.Queue()
     for name in valid_names:
@@ -692,6 +694,8 @@ async def _check(
     for t in tasks:
         t.cancel()
 
+    await checker.disconnect()
+    await shared_session.close()
     dashboard.stop()
 
     from .formatting import format_stats_table
