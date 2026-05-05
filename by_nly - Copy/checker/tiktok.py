@@ -1,6 +1,4 @@
-"""TikTok availability checker — parallel oembed + urlebird + web fallback."""
-
-import asyncio
+"""TikTok availability checker via oembed API + urlebird mirror + web fallback."""
 
 from .base import BaseChecker
 from ..models.enums import Platform, Status
@@ -14,24 +12,26 @@ TIKTOK_UA = (
 
 class TikTokChecker(BaseChecker):
     platform = Platform.TIKTOK
-    max_retries = 1
 
     def __init__(self, session):
         self._session = session
 
     async def _check_via_oembed(self, username: str) -> tuple[Status, str] | None:
         url = f"https://www.tiktok.com/oembed?url=https://www.tiktok.com/@{username}"
+        headers = {
+            "User-Agent": TIKTOK_UA,
+            "Accept": "application/json",
+        }
         try:
             async with self._session.get(
-                url, headers={"User-Agent": TIKTOK_UA, "Accept": "application/json"},
-                timeout=6, allow_redirects=True,
+                url, headers=headers, timeout=8, allow_redirects=True
             ) as resp:
                 if resp.status == 200:
                     text = await resp.text()
                     if username.lower() in text.lower() or "author_name" in text:
                         return Status.TAKEN, "oembed: profile exists"
                     return None
-                elif resp.status in (400, 404):
+                elif resp.status == 400:
                     return Status.AVAILABLE, "oembed: not found"
                 return None
         except Exception:
@@ -39,14 +39,18 @@ class TikTokChecker(BaseChecker):
 
     async def _check_via_urlebird(self, username: str) -> tuple[Status, str] | None:
         url = f"https://urlebird.com/user/{username}/"
+        headers = {
+            "User-Agent": TIKTOK_UA,
+            "Accept": "text/html,application/xhtml+xml",
+        }
         try:
             async with self._session.get(
-                url, headers={"User-Agent": TIKTOK_UA, "Accept": "text/html"},
-                timeout=8, allow_redirects=True,
+                url, headers=headers, timeout=10, allow_redirects=True
             ) as resp:
                 if resp.status == 200:
                     text = await resp.text()
-                    if "followers" in text.lower() or "following" in text.lower():
+                    has_user = "followers" in text.lower() or "following" in text.lower()
+                    if has_user:
                         return Status.TAKEN, "urlebird: profile exists"
                 return None
         except Exception:
@@ -54,24 +58,25 @@ class TikTokChecker(BaseChecker):
 
     async def _check_via_web(self, username: str) -> tuple[Status, str] | None:
         url = f"https://www.tiktok.com/@{username}"
+        headers = {
+            "User-Agent": TIKTOK_UA,
+            "Accept-Language": "en-US,en;q=0.9",
+            "Accept": "text/html,application/xhtml+xml",
+        }
         try:
             async with self._session.get(
-                url, headers={
-                    "User-Agent": TIKTOK_UA,
-                    "Accept-Language": "en-US,en;q=0.9",
-                    "Accept": "text/html,application/xhtml+xml",
-                },
-                timeout=8, allow_redirects=True,
+                url, headers=headers, timeout=10, allow_redirects=True
             ) as resp:
                 if resp.status == 200:
                     text = await resp.text()
-                    if "captcha" in text.lower() or "verify you are human" in text.lower():
+                    is_blocked = "captcha" in text.lower() or "verify you are human" in text.lower()
+                    if is_blocked:
                         return None
-                    has_og = '<meta property="og:title"' in text
+                    has_og_title = '<meta property="og:title"' in text
                     not_found = "could not be found" in text or "doesn't exist" in text
-                    if not_found or ('"statusCode":10221' in text and not has_og):
+                    if not_found or ('"statusCode":10221' in text and not has_og_title):
                         return Status.AVAILABLE, "web: not found"
-                    if has_og:
+                    if has_og_title:
                         return Status.TAKEN, "web: profile exists"
                     return None
                 elif resp.status == 404:
@@ -81,13 +86,16 @@ class TikTokChecker(BaseChecker):
             return None
 
     async def _check_availability(self, username: str) -> tuple[Status, str]:
-        results = await asyncio.gather(
-            self._check_via_oembed(username),
-            self._check_via_urlebird(username),
-            self._check_via_web(username),
-            return_exceptions=True,
-        )
-        for r in results:
-            if r and not isinstance(r, BaseException) and r[0] != Status.UNKNOWN:
-                return r
+        oembed = await self._check_via_oembed(username)
+        if oembed:
+            return oembed
+
+        urlebird = await self._check_via_urlebird(username)
+        if urlebird:
+            return urlebird
+
+        web = await self._check_via_web(username)
+        if web:
+            return web
+
         return Status.UNKNOWN, "all methods blocked (use proxy)"

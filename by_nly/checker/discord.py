@@ -1,7 +1,6 @@
-"""Discord availability checker — uses auth/register endpoint with auto-reconnect.
+"""Discord availability checker — auth/register endpoint with auto-reconnect.
 
-Discord rate-limits aggressively (~10-20 checks per session).
-Auto-reconnects by creating a fresh Safari session every N checks.
+Discord rate-limits aggressively. Auto-reconnects every N checks.
 No DISCORD_TOKEN required.
 """
 
@@ -21,14 +20,12 @@ SAFARI_UA = (
 
 STRONG_PASS = "Xy9#mK2!pQ5$vL8@nR3#aB1"
 RECONNECT_EVERY = 8
-MAX_CONCURRENT = 4
+MAX_CONCURRENT = 6
 
 
 class DiscordChecker(BaseChecker):
     platform = Platform.DISCORD
-    max_retries = 2
-    base_delay = 2.0
-    max_delay = 10.0
+    max_retries = 1
 
     def __init__(self, session):
         self._session = session
@@ -73,106 +70,53 @@ class DiscordChecker(BaseChecker):
                         pass
                     self._check_count = 0
 
-    async def _check_via_register(self, username: str) -> tuple[Status, str] | None:
-        if not self._safari:
-            return None
-
-        url = "https://discord.com/api/v9/auth/register"
-        headers = {
-            "User-Agent": SAFARI_UA,
-            "Accept": "*/*",
-            "Accept-Language": "en-US,en;q=0.9",
-            "Content-Type": "application/json",
-            "Origin": "https://discord.com",
-            "Referer": "https://discord.com/register",
-            "X-Debug-Options": "bugReporterEnabled",
-            "X-Discord-Locale": "en-US",
-        }
-        try:
-            r = await self._safari.post(
-                url,
-                headers=headers,
-                json={
-                    "email": f"{username}@check.example.com",
-                    "username": username,
-                    "password": STRONG_PASS,
-                    "date_of_birth": "2000-01-01",
-                    "consent": True,
-                    "captcha_key": None,
-                },
-                timeout=8,
-            )
-            if r.status_code == 400:
-                data = r.json()
-                errors = data.get("errors", {})
-                username_errs = errors.get("username", {}).get("_errors", [])
-                for e in username_errs:
-                    code = e.get("code", "")
-                    msg = e.get("message", "").lower()
-                    if "taken" in code.lower() or "taken" in msg or "already" in msg or "unavailable" in msg:
-                        return Status.TAKEN, f"register: {msg[:60]}"
-
-                if data.get("captcha_key"):
-                    return Status.AVAILABLE, "register: available (passed validation)"
-
-                return Status.UNKNOWN, f"register: {str(data)[:80]}"
-
-            if r.status_code == 429:
-                return Status.RATE_LIMITED, "register: rate limited"
-
-            return Status.UNKNOWN, f"register: HTTP {r.status_code}"
-        except Exception as e:
-            return Status.UNKNOWN, str(e)[:100]
-
     async def _check_availability(self, username: str) -> tuple[Status, str]:
         async with self._concurrency:
-            for attempt in range(3):
-                await self._maybe_reconnect()
+            await self._maybe_reconnect()
 
-                reg = await self._check_via_register(username)
-                if reg is None:
-                    return Status.UNKNOWN, "no session"
-
-                if reg[0] == Status.RATE_LIMITED:
-                    await _asyncio.sleep(5 * (attempt + 1))
-                    if self._safari:
-                        try:
-                            await self._safari.close()
-                        except Exception:
-                            pass
-                        self._safari = None
-                    continue
-
-                if reg[0] != Status.UNKNOWN:
-                    return reg
-
-                break
-
-            need_msg = "needs DISCORD_TOKEN"
-            if not self._token:
-                return Status.UNKNOWN, f"{need_msg} (session rate-limited)"
-
-            url = "https://discord.com/api/v9/unique-username/username-attempt"
+            url = "https://discord.com/api/v9/auth/register"
+            headers = {
+                "User-Agent": SAFARI_UA,
+                "Accept": "*/*",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Content-Type": "application/json",
+                "Origin": "https://discord.com",
+                "Referer": "https://discord.com/register",
+                "X-Debug-Options": "bugReporterEnabled",
+                "X-Discord-Locale": "en-US",
+            }
             try:
                 r = await self._safari.post(
                     url,
-                    headers={
-                        "Authorization": self._token,
-                        "User-Agent": SAFARI_UA,
-                        "Content-Type": "application/json",
+                    headers=headers,
+                    json={
+                        "email": f"{username}@check.example.com",
+                        "username": username,
+                        "password": STRONG_PASS,
+                        "date_of_birth": "2000-01-01",
+                        "consent": True,
+                        "captcha_key": None,
                     },
-                    json={"username": username},
-                    timeout=8,
+                    timeout=6,
                 )
-                if r.status_code == 200:
+                if r.status_code == 400:
                     data = r.json()
-                    if data.get("taken") is True:
-                        return Status.TAKEN, "token: taken"
-                    elif data.get("taken") is False:
-                        return Status.AVAILABLE, "token: available"
-                    return Status.UNKNOWN, f"token: {data}"
-                if r.status_code == 404:
-                    return Status.UNKNOWN, "token endpoint not found"
-                return Status.UNKNOWN, f"token: HTTP {r.status_code}"
+                    errors = data.get("errors", {})
+                    username_errs = errors.get("username", {}).get("_errors", [])
+                    for e in username_errs:
+                        code = e.get("code", "")
+                        msg = e.get("message", "").lower()
+                        if any(k in code.lower() or k in msg for k in ("taken", "already", "unavailable")):
+                            return Status.TAKEN, f"register: {msg[:60]}"
+
+                    if data.get("captcha_key"):
+                        return Status.AVAILABLE, "register: available (passed validation)"
+
+                    return Status.UNKNOWN, f"register: {str(data)[:80]}"
+
+                if r.status_code == 429:
+                    return Status.RATE_LIMITED, "register: rate limited"
+
+                return Status.UNKNOWN, f"register: HTTP {r.status_code}"
             except Exception as e:
                 return Status.UNKNOWN, str(e)[:100]

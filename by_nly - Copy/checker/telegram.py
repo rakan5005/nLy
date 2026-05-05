@@ -6,7 +6,6 @@ from ..models.enums import Platform, Status
 
 class TelegramChecker(BaseChecker):
     platform = Platform.TELEGRAM
-    max_retries = 2
 
     def __init__(self, session):
         self._session = session
