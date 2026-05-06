@@ -126,15 +126,19 @@ class DiscordChecker(BaseChecker):
             if result[0] not in (Status.UNKNOWN, Status.RATE_LIMITED):
                 return result
 
-            # Session may be burned — reconnect and retry once
+            # Force reconnect — directly create a fresh session
             if self._safari:
                 try:
                     await self._safari.close()
                 except Exception:
                     pass
+            try:
+                proxy_url = self._session._proxy if hasattr(self._session, "_proxy") else None
+                proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
+                self._safari = CurlAsyncSession(impersonate="safari17_0", proxies=proxies)
+            except Exception:
                 self._safari = None
             self._check_count = 0
-            await self._maybe_reconnect()
 
             retry = await self._try_register(username)
             return retry
