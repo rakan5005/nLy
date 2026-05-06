@@ -1,4 +1,4 @@
-"""Live dashboard — shows only available usernames + periodic stats."""
+"""Live dashboard — full results + stats every 1s + beep on available."""
 
 import time
 from rich.console import Console
@@ -19,7 +19,7 @@ HEADER = r"""
 
 
 class Dashboard:
-    """Clean dashboard — only AVAILABLE usernames shown in real-time."""
+    """Full dashboard — shows all results + periodic stats + beep on available."""
 
     def __init__(self, console: Console | None = None):
         self.console = console or Console()
@@ -36,7 +36,7 @@ class Dashboard:
         self.console.print("")
         self.console.print(Text(HEADER, style="bold cyan"))
         self.console.print(Text("=" * 60, style="green"))
-        self.console.print(Text("  CHECKING...  (only AVAILABLE shown)", style="bold cyan"))
+        self.console.print(Text("  CHECKING...", style="bold cyan"))
         self.console.print(Text("=" * 60, style="green"))
         self.console.print("")
         self._last_stats_time = time.monotonic()
@@ -51,18 +51,23 @@ class Dashboard:
             self.console.print(f"  [bold green]AVAILABLE: {username}[/bold green]")
             self.available_usernames.append(username)
             self._avail += 1
-        elif status_name in ("RATE_LIMITED",):
+            print("\a", end="", flush=True)
+        elif status_name.upper() == "TAKEN":
+            self.console.print(f"  [bold red]TAKEN: {username}[/bold red]")
+            self._taken += 1
+        elif status_name.upper() in ("UNKNOWN",):
+            self.console.print(f"  [bold yellow]UNKNOWN: {username}[/bold yellow]")
+            self._unknown += 1
+        elif status_name.upper() in ("RATE_LIMITED",):
+            self.console.print(f"  [bold magenta]BLOCKED: {username}[/bold magenta]")
             self._blocked += 1
-            self.console.print(f"  [bold magenta]BLOCKED:  {username}[/bold magenta]")
         else:
-            if status_name in ("TAKEN", "taken"):
-                self._taken += 1
-            elif status_name in ("UNKNOWN", "unknown"):
-                self._unknown += 1
+            self.console.print(f"  [bold red]TAKEN: {username}[/bold red]")
+            self._taken += 1
 
         self._checked += 1
         now = time.monotonic()
-        if now - self._last_stats_time >= 3:
+        if now - self._last_stats_time >= 1:
             self._last_stats_time = now
             self.console.print(
                 f"  [dim]--- Checked: {self._checked} | "
