@@ -346,13 +346,11 @@ def update():
     console.print("[cyan]Reinstalling...[/]")
     try:
         subprocess.run(
-            [sys.executable, "-m", "pip", "install", "-e", "."],
+            [sys.executable, "-m", "pip", "install", "-e", ".", "--force-reinstall", "--no-deps"],
             capture_output=True, timeout=60,
         )
         console.print("[green]Updated and reinstalled successfully![/]")
-    except Exception as e:
-        console.print(f"[yellow]Reinstall had issues: {e}[/]")
-        console.print("[dim]Try manually: pip install -e .[/]")
+        console.print("[dim]If nLy fails to start, run: pip install -e .[/]")
 
 
 async def _generate(
