@@ -1,7 +1,8 @@
-"""Discord availability checker — auth/register endpoint with auto-reconnect.
+"""Discord availability checker — fast session rotation to avoid rate limits.
 
-Discord rate-limits aggressively. Auto-reconnects every N checks.
-On failure, reconnects and retries once. No DISCORD_TOKEN required.
+Strategy: rotate Safari sessions every 3 checks to distribute load.
+Each session makes few requests, avoiding Discord's per-session rate limit.
+No Discord token required.
 """
 
 import asyncio as _asyncio
@@ -19,13 +20,13 @@ SAFARI_UA = (
 )
 
 STRONG_PASS = "Xy9#mK2!pQ5$vL8@nR3#aB1"
-RECONNECT_EVERY = 5
-MAX_CONCURRENT = 4
+RECONNECT_EVERY = 3
+MAX_CONCURRENT = 8
 
 
 class DiscordChecker(BaseChecker):
     platform = Platform.DISCORD
-    max_retries = 2
+    max_retries = 1
 
     def __init__(self, session):
         self._session = session
@@ -36,11 +37,19 @@ class DiscordChecker(BaseChecker):
         self._concurrency = _asyncio.Semaphore(MAX_CONCURRENT)
 
     async def ensure_connected(self) -> None:
+        self._check_count = 0
+        await self._new_session()
+
+    async def _new_session(self) -> None:
+        if self._safari:
+            try:
+                await self._safari.close()
+            except Exception:
+                pass
         try:
             proxy_url = self._session._proxy if hasattr(self._session, "_proxy") else None
             proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
             self._safari = CurlAsyncSession(impersonate="safari17_0", proxies=proxies)
-            self._check_count = 0
         except Exception:
             self._safari = None
 
@@ -57,20 +66,15 @@ class DiscordChecker(BaseChecker):
         if self._check_count >= RECONNECT_EVERY:
             async with self._reconnect_lock:
                 if self._check_count >= RECONNECT_EVERY:
-                    if self._safari:
-                        try:
-                            await self._safari.close()
-                        except Exception:
-                            pass
-                    try:
-                        proxy_url = self._session._proxy if hasattr(self._session, "_proxy") else None
-                        proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
-                        self._safari = CurlAsyncSession(impersonate="safari17_0", proxies=proxies)
-                    except Exception:
-                        pass
+                    await self._new_session()
                     self._check_count = 0
 
     async def _try_register(self, username: str) -> tuple[Status, str]:
+        if not self._safari:
+            await self._new_session()
+            if not self._safari:
+                return Status.UNKNOWN, "no session"
+
         url = "https://discord.com/api/v9/auth/register"
         headers = {
             "User-Agent": SAFARI_UA,
@@ -84,8 +88,7 @@ class DiscordChecker(BaseChecker):
         }
         try:
             r = await self._safari.post(
-                url,
-                headers=headers,
+                url, headers=headers,
                 json={
                     "email": f"{username}@check.example.com",
                     "username": username,
@@ -94,7 +97,7 @@ class DiscordChecker(BaseChecker):
                     "consent": True,
                     "captcha_key": None,
                 },
-                timeout=6,
+                timeout=5,
             )
             if r.status_code == 400:
                 data = r.json()
@@ -111,11 +114,8 @@ class DiscordChecker(BaseChecker):
 
                 return Status.UNKNOWN, f"register: {str(data)[:80]}"
 
-            if r.status_code == 429:
-                return Status.RATE_LIMITED, "register: rate limited"
-
-            if r.status_code == 403:
-                return Status.RATE_LIMITED, "register: IP blocked"
+            if r.status_code in (429, 403):
+                return Status.RATE_LIMITED, f"register: HTTP {r.status_code}"
 
             return Status.UNKNOWN, f"register: HTTP {r.status_code}"
         except Exception as e:
@@ -124,27 +124,11 @@ class DiscordChecker(BaseChecker):
     async def _check_availability(self, username: str) -> tuple[Status, str]:
         async with self._concurrency:
             await self._maybe_reconnect()
-
             result = await self._try_register(username)
-            if result[0] not in (Status.UNKNOWN, Status.RATE_LIMITED):
-                await _asyncio.sleep(0.3)
-                return result
 
-            # Blocked — wait and reconnect
-            await _asyncio.sleep(3)
-            if self._safari:
-                try:
-                    await self._safari.close()
-                except Exception:
-                    pass
-            try:
-                proxy_url = self._session._proxy if hasattr(self._session, "_proxy") else None
-                proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
-                self._safari = CurlAsyncSession(impersonate="safari17_0", proxies=proxies)
-            except Exception:
-                self._safari = None
-            self._check_count = 0
+            if result[0] in (Status.RATE_LIMITED, Status.UNKNOWN):
+                await self._new_session()
+                self._check_count = 0
+                result = await self._try_register(username)
 
-            retry = await self._try_register(username)
-            await _asyncio.sleep(0.3)
-            return retry
+            return result
