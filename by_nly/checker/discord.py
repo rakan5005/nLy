@@ -114,6 +114,9 @@ class DiscordChecker(BaseChecker):
             if r.status_code == 429:
                 return Status.RATE_LIMITED, "register: rate limited"
 
+            if r.status_code == 403:
+                return Status.RATE_LIMITED, "register: IP blocked"
+
             return Status.UNKNOWN, f"register: HTTP {r.status_code}"
         except Exception as e:
             return Status.UNKNOWN, str(e)[:100]
@@ -124,9 +127,11 @@ class DiscordChecker(BaseChecker):
 
             result = await self._try_register(username)
             if result[0] not in (Status.UNKNOWN, Status.RATE_LIMITED):
+                await _asyncio.sleep(0.3)
                 return result
 
-            # Force reconnect — directly create a fresh session
+            # Blocked — wait and reconnect
+            await _asyncio.sleep(3)
             if self._safari:
                 try:
                     await self._safari.close()
@@ -141,4 +146,5 @@ class DiscordChecker(BaseChecker):
             self._check_count = 0
 
             retry = await self._try_register(username)
+            await _asyncio.sleep(0.3)
             return retry
