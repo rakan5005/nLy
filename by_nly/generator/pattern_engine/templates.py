@@ -10,8 +10,15 @@ PATTERN_SETS = {
         "lld", "dll",
     ],
     "triple": [
-        "lll", "lld", "ldl", "dll",
-        "ldl", "dl_l",
+        "lll", "lld", "ldl", "dll", "dld", "ldd", "ddl",
+        "l_l", "l.l", "d_d", "d.d",
+        "l_d", "l.d", "d_l", "d.l",
+    ],
+    "triple_mixed": [
+        "lll", "lld", "ldl", "dll", "dld", "ldd", "ddl",
+        "l_l", "l.l", "l_d", "l.d",
+        "d_l", "d.l", "d_d", "d.d",
+        "ll_d", "ll.d", "dd_l", "dd.l",
     ],
     "semi3": [
         "lll", "lld", "ldl", "dll",
@@ -35,7 +42,7 @@ PATTERN_SETS = {
 # "full" is the union of all others
 PATTERN_SETS["full"] = (
     PATTERN_SETS["2letters"] + PATTERN_SETS["semi2"]
-    + PATTERN_SETS["triple"] + PATTERN_SETS["semi3"]
+    + PATTERN_SETS["triple"] + PATTERN_SETS["triple_mixed"] + PATTERN_SETS["semi3"]
     + PATTERN_SETS["quad"] + PATTERN_SETS["quad_repeat"]
 )
 
