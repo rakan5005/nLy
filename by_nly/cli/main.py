@@ -351,6 +351,9 @@ def update():
         )
         console.print("[green]Updated and reinstalled successfully![/]")
         console.print("[dim]If nLy fails to start, run: pip install -e .[/]")
+    except Exception as e:
+        console.print(f"[yellow]Reinstall had issues: {e}[/]")
+        console.print("[dim]Try manually: pip install -e .[/]")
 
 
 async def _generate(
