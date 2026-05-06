@@ -63,7 +63,7 @@ class DiscordChecker(BaseChecker):
                     "consent": True,
                     "captcha_key": None,
                 },
-                timeout=5,
+                timeout=4,
             )
 
             if r.status_code == 400:

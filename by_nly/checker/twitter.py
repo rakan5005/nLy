@@ -34,7 +34,7 @@ class TwitterChecker(BaseChecker):
         url = f"https://x.com/{username}"
         try:
             async with self._session.get(
-                url, headers={"User-Agent": BOT_UA}, timeout=8, allow_redirects=True
+                url, headers={"User-Agent": BOT_UA}, timeout=5, allow_redirects=True
             ) as resp:
                 if resp.status == 404:
                     return Status.AVAILABLE, "x.com: 404 (bot UA)"
@@ -53,7 +53,7 @@ class TwitterChecker(BaseChecker):
         url = f"https://{instance}/{username}"
         try:
             async with self._session.get(
-                url, headers={"User-Agent": TWITTER_UA}, timeout=5, allow_redirects=True
+                url, headers={"User-Agent": TWITTER_UA}, timeout=4, allow_redirects=True
             ) as resp:
                 if resp.status == 200:
                     text = await resp.text()

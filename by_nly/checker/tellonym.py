@@ -41,7 +41,7 @@ class TellonymChecker(BaseChecker):
                 "https://tellonym.me/api/accounts/check",
                 params={"username": username},
                 headers={"Accept": "application/json", "Referer": "https://tellonym.me/"},
-                timeout=5,
+                timeout=4,
             )
             if r.status_code == 429:
                 return Status.RATE_LIMITED, "rate limited"

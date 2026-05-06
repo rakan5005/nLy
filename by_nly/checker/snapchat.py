@@ -24,7 +24,7 @@ class SnapchatChecker(BaseChecker):
         try:
             async with self._session.get(
                 url, headers={"User-Agent": SNAPCHAT_UA, "Accept": "application/json"},
-                timeout=6, allow_redirects=True,
+                timeout=4, allow_redirects=True,
             ) as resp:
                 if resp.status == 200:
                     return Status.TAKEN, "bitmoji: user found"
@@ -38,7 +38,7 @@ class SnapchatChecker(BaseChecker):
         url = f"https://www.snapchat.com/add/{username}"
         try:
             async with self._session.get(
-                url, headers={"User-Agent": SNAPCHAT_UA}, timeout=8, allow_redirects=True
+                url, headers={"User-Agent": SNAPCHAT_UA}, timeout=5, allow_redirects=True
             ) as resp:
                 if resp.status == 200:
                     text = await resp.text()

@@ -24,7 +24,7 @@ class TikTokChecker(BaseChecker):
         try:
             async with self._session.get(
                 url, headers={"User-Agent": TIKTOK_UA, "Accept": "application/json"},
-                timeout=6, allow_redirects=True,
+                timeout=4, allow_redirects=True,
             ) as resp:
                 if resp.status == 200:
                     text = await resp.text()
@@ -42,7 +42,7 @@ class TikTokChecker(BaseChecker):
         try:
             async with self._session.get(
                 url, headers={"User-Agent": TIKTOK_UA, "Accept": "text/html"},
-                timeout=8, allow_redirects=True,
+                timeout=5, allow_redirects=True,
             ) as resp:
                 if resp.status == 200:
                     text = await resp.text()
@@ -61,7 +61,7 @@ class TikTokChecker(BaseChecker):
                     "Accept-Language": "en-US,en;q=0.9",
                     "Accept": "text/html,application/xhtml+xml",
                 },
-                timeout=8, allow_redirects=True,
+                timeout=6, allow_redirects=True,
             ) as resp:
                 if resp.status == 200:
                     text = await resp.text()

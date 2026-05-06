@@ -6,17 +6,14 @@ from ..models.enums import Platform, Status
 
 class TelegramChecker(BaseChecker):
     platform = Platform.TELEGRAM
-    max_retries = 2
+    max_retries = 1
 
     def __init__(self, session):
         self._session = session
-        # MTProto disabled by default - requires phone auth which hangs.
-        # Use t.me web fallback only (no auth needed, IP-safe).
         self._client = None
         self._use_mtproto = False
 
     async def ensure_connected(self) -> None:
-        # No-op: web-only checker needs no connection setup
         pass
 
     async def disconnect(self) -> None:
@@ -33,7 +30,7 @@ class TelegramChecker(BaseChecker):
         }
         try:
             async with self._session.get(
-                url, headers=headers, timeout=8, allow_redirects=True
+                url, headers=headers, timeout=4, allow_redirects=True
             ) as resp:
                 if resp.status == 200:
                     text = await resp.text()
