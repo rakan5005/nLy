@@ -95,11 +95,14 @@ async def interactive_mode():
     pattern = arrow_select(
         "Select pattern:",
         [
-            ("semi2",  "Semi-Binary  (2-3 chars)"),
-            ("semi3",  "Semi-Ternary (3-4 chars)"),
-            ("quad",   "Quad         (4-5 chars)"),
-            ("full",   "Full         (all)"),
-            ("custom", "Custom       (your own)"),
+            ("2letters",    "Two Letters    (2 chars: ll, ld, l.l)"),
+            ("semi2",       "Semi-Binary    (2-3 chars)"),
+            ("triple",      "Triple         (3 chars: lll, lld)"),
+            ("semi3",       "Semi-Ternary   (3-4 chars)"),
+            ("quad",        "Quad           (4 chars: llll)"),
+            ("quad_repeat", "Quad Repeat    (4 chars: ll.ll, l_l_l)"),
+            ("full",        "Full           (all types)"),
+            ("custom",      "Custom         (your own)"),
         ],
     )
     if pattern is None:

@@ -1,10 +1,17 @@
-"""Built-in pattern template sets (semi2, semi3, quad, full)."""
+"""Built-in pattern template sets with granular categories."""
 
 PATTERN_SETS = {
+    "2letters": [
+        "ll", "ld", "dl", "l_l", "l.l",
+    ],
     "semi2": [
         "ll", "ld", "dl",
         "l_l", "l.l",
         "lld", "dll",
+    ],
+    "triple": [
+        "lll", "lld", "ldl", "dll",
+        "ldl", "dl_l",
     ],
     "semi3": [
         "lll", "lld", "ldl", "dll",
@@ -17,11 +24,20 @@ PATTERN_SETS = {
         "llld", "dllld", "lldd", "ldll",
         "lll.l", "ll.ll", "l.l.l.l",
     ],
-    "full": [],  # resolved recursively below
+    "quad_repeat": [
+        "ll.ll", "l.l.l.l",
+        "ll_ll", "l_l_l_l",
+        "ld.ld", "l.l.l",
+    ],
+    "full": [],
 }
 
 # "full" is the union of all others
-PATTERN_SETS["full"] = PATTERN_SETS["semi2"] + PATTERN_SETS["semi3"] + PATTERN_SETS["quad"]
+PATTERN_SETS["full"] = (
+    PATTERN_SETS["2letters"] + PATTERN_SETS["semi2"]
+    + PATTERN_SETS["triple"] + PATTERN_SETS["semi3"]
+    + PATTERN_SETS["quad"] + PATTERN_SETS["quad_repeat"]
+)
 
 
 def get_patterns(pattern_type: str) -> list[str]:
