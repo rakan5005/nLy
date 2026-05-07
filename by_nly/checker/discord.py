@@ -1,8 +1,7 @@
-"""Discord availability checker — session pool, 15 concurrent, auto-retry.
+"""Discord availability checker — session pool for maximum speed.
 
-Each check gets a fresh Safari session (no race conditions).
-15 concurrent max — fast but won't overwhelm Discord.
-On failure: wait 1s, new session, retry once.
+Pre-creates a pool of Safari sessions, reused across checks.
+No per-check session creation overhead. 20 concurrent max.
 No Discord token required.
 """
 
@@ -21,7 +20,7 @@ SAFARI_UA = (
 )
 
 STRONG_PASS = "Xy9#mK2!pQ5$vL8@nR3#aB1"
-MAX_CONCURRENT = 15
+POOL_SIZE = 20
 
 
 class DiscordChecker(BaseChecker):
@@ -31,21 +30,54 @@ class DiscordChecker(BaseChecker):
     def __init__(self, session):
         self._session = session
         self._token = os.environ.get("DISCORD_TOKEN", "").strip()
-        self._concurrency = _asyncio.Semaphore(MAX_CONCURRENT)
+        self._pool: list[CurlAsyncSession] = []
+        self._pool_lock = _asyncio.Lock()
+        self._sem = _asyncio.Semaphore(POOL_SIZE)
 
     async def ensure_connected(self) -> None:
-        pass
-
-    async def disconnect(self) -> None:
-        pass
-
-    async def _try_register(self, username: str) -> tuple[Status, str]:
         proxy_url = self._session._proxy if hasattr(self._session, "_proxy") else None
         proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
+        for _ in range(POOL_SIZE):
+            try:
+                self._pool.append(CurlAsyncSession(impersonate="safari17_0", proxies=proxies))
+            except Exception:
+                pass
 
-        saf = None
+    async def disconnect(self) -> None:
+        for saf in self._pool:
+            try:
+                await saf.close()
+            except Exception:
+                pass
+        self._pool.clear()
+
+    async def _get_session(self) -> CurlAsyncSession | None:
+        async with self._pool_lock:
+            if self._pool:
+                return self._pool.pop()
+        proxy_url = self._session._proxy if hasattr(self._session, "_proxy") else None
+        proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
         try:
-            saf = CurlAsyncSession(impersonate="safari17_0", proxies=proxies)
+            return CurlAsyncSession(impersonate="safari17_0", proxies=proxies)
+        except Exception:
+            return None
+
+    async def _put_session(self, saf: CurlAsyncSession) -> None:
+        async with self._pool_lock:
+            if len(self._pool) < POOL_SIZE:
+                self._pool.append(saf)
+            else:
+                try:
+                    await saf.close()
+                except Exception:
+                    pass
+
+    async def _try_register(self, username: str) -> tuple[Status, str]:
+        saf = await self._get_session()
+        if not saf:
+            return Status.UNKNOWN, "no session available"
+
+        try:
             r = await saf.post(
                 "https://discord.com/api/v9/auth/register",
                 headers={
@@ -77,32 +109,31 @@ class DiscordChecker(BaseChecker):
                     code = e.get("code", "")
                     msg = e.get("message", "").lower()
                     if any(k in code.lower() or k in msg for k in ("taken", "already", "unavailable")):
+                        await self._put_session(saf)
                         return Status.TAKEN, f"register: {msg[:60]}"
 
                 if data.get("captcha_key"):
+                    await self._put_session(saf)
                     return Status.AVAILABLE, "register: available (passed validation)"
 
+                await self._put_session(saf)
                 return Status.UNKNOWN, f"register: {str(data)[:80]}"
 
             if r.status_code in (429, 403):
+                await self._put_session(saf)
                 return Status.RATE_LIMITED, f"register: HTTP {r.status_code}"
 
+            await self._put_session(saf)
             return Status.UNKNOWN, f"register: HTTP {r.status_code}"
 
         except Exception as e:
+            await self._put_session(saf)
             return Status.UNKNOWN, str(e)[:60]
-        finally:
-            if saf:
-                try:
-                    await saf.close()
-                except Exception:
-                    pass
 
     async def _check_availability(self, username: str) -> tuple[Status, str]:
-        async with self._concurrency:
+        async with self._sem:
             result = await self._try_register(username)
             if result[0] not in (Status.UNKNOWN, Status.RATE_LIMITED):
                 return result
 
-            await _asyncio.sleep(1)
             return await self._try_register(username)
