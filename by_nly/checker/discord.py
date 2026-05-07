@@ -1,7 +1,9 @@
-"""Discord availability checker — fresh session per check, no race conditions.
+"""Discord availability checker — session pool, 15 concurrent, auto-retry.
 
-Each check creates its own Safari session. Simple, fast, race-free.
-No DiscORD_TOKEN required.
+Each check gets a fresh Safari session (no race conditions).
+15 concurrent max — fast but won't overwhelm Discord.
+On failure: wait 1s, new session, retry once.
+No Discord token required.
 """
 
 import asyncio as _asyncio
@@ -19,6 +21,7 @@ SAFARI_UA = (
 )
 
 STRONG_PASS = "Xy9#mK2!pQ5$vL8@nR3#aB1"
+MAX_CONCURRENT = 15
 
 
 class DiscordChecker(BaseChecker):
@@ -28,6 +31,7 @@ class DiscordChecker(BaseChecker):
     def __init__(self, session):
         self._session = session
         self._token = os.environ.get("DISCORD_TOKEN", "").strip()
+        self._concurrency = _asyncio.Semaphore(MAX_CONCURRENT)
 
     async def ensure_connected(self) -> None:
         pass
@@ -35,14 +39,13 @@ class DiscordChecker(BaseChecker):
     async def disconnect(self) -> None:
         pass
 
-    async def _check_availability(self, username: str) -> tuple[Status, str]:
+    async def _try_register(self, username: str) -> tuple[Status, str]:
         proxy_url = self._session._proxy if hasattr(self._session, "_proxy") else None
         proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
 
         saf = None
         try:
             saf = CurlAsyncSession(impersonate="safari17_0", proxies=proxies)
-
             r = await saf.post(
                 "https://discord.com/api/v9/auth/register",
                 headers={
@@ -87,10 +90,19 @@ class DiscordChecker(BaseChecker):
             return Status.UNKNOWN, f"register: HTTP {r.status_code}"
 
         except Exception as e:
-            return Status.UNKNOWN, str(e)[:100]
+            return Status.UNKNOWN, str(e)[:60]
         finally:
             if saf:
                 try:
                     await saf.close()
                 except Exception:
                     pass
+
+    async def _check_availability(self, username: str) -> tuple[Status, str]:
+        async with self._concurrency:
+            result = await self._try_register(username)
+            if result[0] not in (Status.UNKNOWN, Status.RATE_LIMITED):
+                return result
+
+            await _asyncio.sleep(1)
+            return await self._try_register(username)
