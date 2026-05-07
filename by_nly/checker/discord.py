@@ -15,7 +15,7 @@ SAFARI_UA = (
 )
 
 STRONG_PASS = "Xy9#mK2!pQ5$vL8@nR3#aB1"
-MAX_CONCURRENT = 30
+MAX_CONCURRENT = 8
 
 
 class DiscordChecker(BaseChecker):
