@@ -15,7 +15,7 @@ SAFARI_UA = (
 )
 
 STRONG_PASS = "Xy9#mK2!pQ5$vL8@nR3#aB1"
-MAX_CONCURRENT = 20
+MAX_CONCURRENT = 30
 
 
 class DiscordChecker(BaseChecker):
@@ -60,7 +60,7 @@ class DiscordChecker(BaseChecker):
                     "consent": True,
                     "captcha_key": None,
                 },
-                timeout=4,
+                timeout=3,
             )
 
             if r.status_code == 400:
