@@ -212,7 +212,7 @@ async def _run_check(platform, pattern, limit, workers, sm, proxy_manager, fast_
     _warning_shown = False
 
     shared_session = await _create_session_with_proxy(proxy_manager)
-    checker = get_checker(platform, shared_session)
+    checker = get_checker(platform, shared_session, proxy_manager=proxy_manager)
     await checker.ensure_connected()
 
     async def worker(queue: asyncio.Queue, worker_id: int):

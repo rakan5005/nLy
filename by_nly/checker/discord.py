@@ -1,4 +1,9 @@
-"""Discord availability checker — fresh session per check, auto-retry on failure."""
+"""Discord availability checker — rotating proxy support for max speed.
+
+Without proxy: 8 concurrent (safe limit for single IP).
+With proxy: 40 concurrent (each request gets a different IP via rotation).
+Supports both rotating gateway proxy and proxy file with multiple URLs.
+"""
 
 import asyncio as _asyncio
 import os
@@ -15,17 +20,22 @@ SAFARI_UA = (
 )
 
 STRONG_PASS = "Xy9#mK2!pQ5$vL8@nR3#aB1"
-MAX_CONCURRENT = 8
+NO_PROXY_CONCURRENT = 8
+PROXY_CONCURRENT = 40
 
 
 class DiscordChecker(BaseChecker):
     platform = Platform.DISCORD
     max_retries = 1
 
-    def __init__(self, session):
+    def __init__(self, session, proxy_manager=None):
         self._session = session
+        self._proxy_manager = proxy_manager
         self._token = os.environ.get("DISCORD_TOKEN", "").strip()
-        self._sem = _asyncio.Semaphore(MAX_CONCURRENT)
+        base_proxy = self._session._proxy if hasattr(self._session, "_proxy") else None
+        self._has_proxy = bool(base_proxy or (proxy_manager and proxy_manager.alive_count > 0))
+        self._concurrent = PROXY_CONCURRENT if self._has_proxy else NO_PROXY_CONCURRENT
+        self._sem = _asyncio.Semaphore(self._concurrent)
 
     async def ensure_connected(self) -> None:
         pass
@@ -33,8 +43,15 @@ class DiscordChecker(BaseChecker):
     async def disconnect(self) -> None:
         pass
 
+    async def _get_proxy(self) -> str | None:
+        if self._proxy_manager and self._proxy_manager.alive_count > 0:
+            p = await self._proxy_manager.get_next()
+            if p:
+                return p.url
+        return self._session._proxy if hasattr(self._session, "_proxy") else None
+
     async def _try_register(self, username: str) -> tuple[Status, str]:
-        proxy_url = self._session._proxy if hasattr(self._session, "_proxy") else None
+        proxy_url = await self._get_proxy()
         proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
 
         saf = None

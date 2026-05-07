@@ -10,7 +10,7 @@ from .tellonym import TellonymChecker
 from .discord import DiscordChecker
 
 
-def get_checker(platform: Platform, session) -> BaseChecker:
+def get_checker(platform: Platform, session, proxy_manager=None) -> BaseChecker:
     checkers = {
         Platform.SNAPCHAT: SnapchatChecker,
         Platform.TELEGRAM: TelegramChecker,
@@ -22,4 +22,6 @@ def get_checker(platform: Platform, session) -> BaseChecker:
     cls = checkers.get(platform)
     if cls is None:
         raise ValueError(f"No checker registered for platform: {platform}")
+    if platform == Platform.DISCORD:
+        return cls(session, proxy_manager=proxy_manager)
     return cls(session)
